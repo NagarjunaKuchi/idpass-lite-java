@@ -1,0 +1,209 @@
+/*
+ * Copyright 2020 Newlogic Impact Lab Pte. Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ *
+ *
+ */
+
+plugins {
+    id 'java-library'
+    id 'application'
+    id 'signing'
+    id 'maven'
+    id "com.google.protobuf" version "0.8.14"
+}
+
+ext {
+    artifactId = "idpass-lite-java"
+    groupId = "org.idpass"
+    version = '0.0.1-SNAPSHOT'
+    description = "ID PASS Lite (Java) is a wrapper API of libidpasslite.so"
+}
+
+repositories {
+    mavenCentral()
+    google()
+    jcenter()
+}
+
+group project.ext.groupId
+version = project.ext.version
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+sourceSets {
+    main {
+        resources {
+            srcDirs "src/main/resources"
+        }
+
+        java {
+            srcDirs 'build/generated/source/proto/main/grpc'
+            srcDirs 'build/generated/source/proto/main/java'
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:3.14.0'
+    }
+
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.34.1'
+        }
+    }
+
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {}
+        }
+    }
+}
+
+javadoc {
+    // without the -quiet option, the build fails
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+test {
+    useJUnitPlatform()
+}
+
+// Dependencies
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.3.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.3.1'
+
+    testImplementation 'org.mockito:mockito-core:2.28.2'
+
+    //////////////// idpass //////////////////////
+    implementation 'com.google.protobuf:protobuf-java:3.12.2'
+    testImplementation 'com.google.zxing:core:3.4.0'
+    testImplementation 'com.google.zxing:javase:3.4.0'
+    implementation 'at.favre.lib:bytes:1.3.0'
+
+    // These jars only needed by TestCases.java for unit testing purposes only
+    // will not be a transitive dependency in client apps. It is used to convert
+    // PNG to SVG as an additional test case
+    testImplementation group: 'org.apache.xmlgraphics', name: 'batik-transcoder', version: '1.13'
+    testRuntimeOnly group: 'org.apache.xmlgraphics', name: 'batik-transcoder', version: '1.13'
+    testImplementation group: 'com.twelvemonkeys.imageio', name: 'imageio-batik', version: '3.6'
+    testRuntimeOnly group: 'com.twelvemonkeys.imageio', name: 'imageio-batik', version: '3.6'
+    compile 'io.grpc:grpc-all:1.34.1'
+}
+
+signing {
+    if (project.hasProperty('signing.keyId') &&
+        project.hasProperty('signing.password') &&
+        project.hasProperty('signing.secretKeyRingFile')) {
+        sign configurations.archives
+    }
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourcesJar, javadocJar
+}
+
+tasks.withType(Test) {
+    // a collection to track failedTests
+    ext.failedTests = []
+
+    afterTest { descriptor, result ->
+        if (result.resultType == TestResult.ResultType.FAILURE) {
+            String failedTest = "${descriptor.className}::${descriptor.name}"
+            logger.debug("Adding " + failedTest + " to failedTests...")
+            failedTests << [failedTest]
+        }
+    }
+
+    afterSuite { suite, result ->
+        if (!suite.parent) { // will match the outermost suite
+            // logs each failed test
+            if (!failedTests.empty) {
+                logger.lifecycle("Failed tests:")
+                failedTests.each { failedTest ->
+                    logger.lifecycle("${failedTest}")
+                }
+            }
+        }
+    }
+}
+
+uploadArchives {
+  repositories {
+    mavenDeployer {
+      beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+      if (project.hasProperty('ossrhUsername') && project.hasProperty('ossrhPassword')) {
+        repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+          authentication(userName: project.getProperty('ossrhUsername'),
+                         password: project.getProperty('ossrhPassword'))
+        }
+
+        snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+          authentication(userName: project.getProperty('ossrhUsername'),
+                         password: project.getProperty('ossrhPassword'))
+        }
+      }
+
+      pom.project {
+        name 'ID PASS Lite'
+        packaging 'jar'
+        // optionally artifactId can be defined here
+        artifactId project.ext.artifactId
+        description 'ID PASS Lite (Java) is a wrapper API of libidpasslite.so'
+        url 'https://github.com/idpass/idpass-lite-java'
+
+        scm {
+          connection 'scm:git:git://github.com/idpass/idpass-lite-java.git'
+          developerConnection 'scm:git:ssh://github.com:idpass/idpass-lite-java.git'
+          url 'https://github.com/idpass/idpass-lite-java/tree/master'
+        }
+
+        licenses {
+          license {
+            name 'The Apache License, Version 2.0'
+            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+          }
+        }
+
+        developers {
+          developer {
+            id 'jeremi'
+            name 'Jeremi Joslin'
+            email 'jeremi@newlogic.com'
+          }
+          developer {
+            id 'typelogic'
+            name 'Dexter Aparicio'
+            email 'dexter@newlogic.com'
+          }
+        }
+      }
+    }
+  }
+}
