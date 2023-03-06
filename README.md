@@ -1,23 +1,10 @@
 # ID PASS Lite for Java
-
-[![CircleCI](https://circleci.com/gh/idpass/idpass-lite-java.svg?style=svg&circle-token=4fb5cc4cfe96b754d1842c2443ee638608bc4755)](https://circleci.com/gh/idpass/idpass-lite-java)
-
 This is a Java wrapper of the [libidpasslite](https://github.com/idpass/idpass-lite) library that provides developers with an API to create and interact with ID PASS Lite cards.
 
 ## Building
 ```bash
 ./gradlew build
 ```
-
-## Features
-- create card with face
-- verify card with face
-- verify card with pin
-- sign with card
-- encrypt with card
-- add/revoke/verify certificates
-- generate QR Code
-- read QR Code
 
 ## Quick start
 Sample usage....
